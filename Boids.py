@@ -19,23 +19,15 @@ COHESION_RADIUS = NEARBY_RADIUS
 BOID_SHAPE = 0.1875  # Modifies triangle shape. Ideal around 0.2
 BOID_SIZE = 7.5
 
-
-def vector_copy(vector):
-	copy = Vector(vector.x, vector.y)
-	return copy
+BOID_COLOR = (191, 55, 55)
+BACKGROUND_COLOR = (26, 34, 43)
 
 
+# Adjusts vector to a different magnitude while maintaining direction
 def vector_set_magnitude(vector, mag):
 	angle = np.arctan2(vector.y, vector.x)
 	vector.y = mag * np.sin(angle)
 	vector.x = mag * np.cos(angle)
-
-
-def vector_set_limit(vector, limit):
-	magnitude = np.hypot(vector.y, vector.x)
-
-	if magnitude > limit:
-		vector_set_magnitude(vector, limit)
 
 
 class Boid:
@@ -45,6 +37,7 @@ class Boid:
 
 		self.friends = []
 
+	# Moves a boid to its new position, wraps it if neccessary
 	def move(self, boids):
 		self.wrap()
 
@@ -53,27 +46,39 @@ class Boid:
 
 		self.position += self.velocity
 
+	# Uses all of the rules to update the boid velocity
 	def flock(self):
 		allign = self.get_alignment()
 		avoidDir = self.get_separation()
 		noise = Vector(random() * 2 - 1, random() * 2 - 1)
 		cohese = self.get_cohesion()
 
+		# Change vector multipliers here:
+
 		allign *= 1.3
 
-		avoidDir *= 0.3
+		avoidDir *= 0.4
 
 		noise *= 0.1
 
 		cohese *= 8
+
+		# Increaseing a multiplier will give that rule more control over the
+		# general direction of the boid. Change at your own risk!d
 
 		self.velocity += allign
 		self.velocity += avoidDir
 		self.velocity += noise
 		self.velocity += cohese
 
-		vector_set_limit(self.velocity, MAX_SPEED)
+		# Restricts velocity to the max speed so boids don't reach infinite speed
 
+		magnitude = np.hypot(self.velocity.y, self.velocity.x)
+
+		if magnitude > MAX_SPEED:
+			vector_set_magnitude(self.velocity, MAX_SPEED)
+
+	# Gets boids nearby to the the current boid
 	def get_nearby(self, boids):
 		nearby = []
 		for b in boids:
@@ -85,6 +90,7 @@ class Boid:
 
 		self.friends = nearby
 
+	# Gets the alignment vector
 	def get_alignment(self):
 		sumVector = Vector(0, 0)
 		count = 0
@@ -93,7 +99,7 @@ class Boid:
 			d = np.linalg.norm(self.position - b.position)
 
 			if d > 0 and d < NEARBY_RADIUS:
-				copy = vector_copy(b.velocity)
+				copy = Vector(b.velocity.x, b.velocity.y)
 				copy.normalize()
 				copy /= d
 				sumVector += copy
@@ -101,6 +107,7 @@ class Boid:
 
 		return sumVector
 
+	# Gets the seperation vector
 	def get_separation(self):
 		steer = Vector(0, 0)
 		count = 0
@@ -119,6 +126,7 @@ class Boid:
 
 		return steer
 
+	# Gets the cohesion vector
 	def get_cohesion(self):
 		neighbordist = 50
 		sumVector = Vector(0, 0)
@@ -140,6 +148,7 @@ class Boid:
 		else:
 			return Vector(0, 0)
 
+	# Gets the rotated position vectors of a boid based on direction
 	def position_vectors(self):
 		degree = np.arctan2(self.velocity.y, self.velocity.x)
 
@@ -153,6 +162,7 @@ class Boid:
 
 		return result
 
+	# Makes sure the boids don't fly off the screen
 	def wrap(self):
 		self.position.x = (self.position.x + SCREEN_WIDTH) % SCREEN_WIDTH
 		self.position.y = (self.position.y + SCREEN_HEIGHT) % SCREEN_HEIGHT
@@ -165,9 +175,11 @@ class Game:
 		for x in range(50):
 			self.boids.append(Boid(random() * width, random() * height))
 
-	def add_boid(self, y, x):
-		self.boids.append(Boid(y, x))
+	# Adds a boid to a given "x" and "y"
+	def add_boid(self, x, y):
+		self.boids.append(Boid(x, y))
 
+	# Updates the position of all boids
 	def run(self):
 		for b in self.boids:
 			b.move(self.boids)
@@ -178,27 +190,30 @@ if __name__ == "__main__":
 	pg.init()
 	screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 	clock = pg.time.Clock()
-	screen.fill((26, 34, 43))
+	screen.fill(BACKGROUND_COLOR)
 
 	while True:
 		for event in pg.event.get():
+			# Exits window on quit
 			if event.type == pg.QUIT:
 				pg.quit()
 				exit(0)
+			# Triggers add boid
 			elif event.type == pg.MOUSEBUTTONUP:
 				pos = pg.mouse.get_pos()
 				game.add_boid(pos[0], pos[1])
+			# Toggles pause
 			elif event.type == pg.KEYUP and event.key == pg.K_SPACE:
 				game.paused = not game.paused
 
 		clock.tick(FPS)
 
-		screen.fill((26, 34, 43))
+		screen.fill(BACKGROUND_COLOR)
 
 		if not game.paused:
 			game.run()
 
 		for boid in game.boids:
-			pg.draw.polygon(screen, (191, 55, 55), boid.position_vectors())
+			pg.draw.polygon(screen, BOID_COLOR, boid.position_vectors())
 
 		pg.display.update()
